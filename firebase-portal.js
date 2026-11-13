@@ -78,18 +78,28 @@ const specialBadges=[
  {id:"extra",icon:"🌟",name:"Above and Beyond",description:"An outstanding optional challenge."}
 ];
 let achievementTown=null,specialAwards=[];
+function openBadge(b,unlocked,special){
+ $("badgeDialogIcon").textContent=b.icon;
+ $("badgeDialogTitle").textContent=b.name;
+ $("badgeDialogStatus").textContent=unlocked?"🎉 Achievement Unlocked!":"🔒 Not unlocked yet";
+ $("badgeDialogDescription").textContent=b.description;
+ $("badgeDialogHint").textContent=unlocked?(special?"Special recognition awarded by your parent. Amazing work!":"You earned this through your town-building journey. Keep going!"):(special?"Your parent can award this badge for exceptional work.":"Keep progressing to unlock this milestone.");
+ $("badgeDialog").showModal();
+}
+$("badgeDialogClose").onclick=()=>$("badgeDialog").close();
+$("badgeDialog").addEventListener("click",e=>{if(e.target===$("badgeDialog"))$("badgeDialog").close()});
 function drawAchievements(){
  const root=$("achievementList");root.replaceChildren();
  let earned=0;
  for(const b of milestoneBadges){
   const unlocked=achievementTown?b.check(achievementTown):false;if(unlocked)earned++;
-  const el=document.createElement("div");el.style.cssText="flex:1 1 165px;max-width:250px;border:1px solid #d4c6e9;border-radius:12px;padding:12px;background:white;opacity:"+(unlocked?"1":".55");
+  const el=document.createElement("button");el.type="button";el.setAttribute("aria-label","View "+b.name+" achievement details");el.onclick=()=>openBadge(b,unlocked,false);el.style.cssText="text-align:left;cursor:pointer;flex:1 1 165px;max-width:250px;border:1px solid #d4c6e9;border-radius:12px;padding:12px;background:white;opacity:"+(unlocked?"1":".55");
   const title=document.createElement("strong");title.textContent=b.icon+" "+b.name+(unlocked?" ✓":" 🔒");
   const desc=document.createElement("p");desc.textContent=b.description;el.append(title,desc);root.append(el);
  }
  for(const b of specialBadges){
   const unlocked=specialAwards.includes(b.id);if(unlocked)earned++;
-  const el=document.createElement("div");el.style.cssText="flex:1 1 165px;max-width:250px;border:1px solid #d4c6e9;border-radius:12px;padding:12px;background:white;opacity:"+(unlocked?"1":".55");
+  const el=document.createElement("button");el.type="button";el.setAttribute("aria-label","View "+b.name+" achievement details");el.onclick=()=>openBadge(b,unlocked,true);el.style.cssText="text-align:left;cursor:pointer;flex:1 1 165px;max-width:250px;border:1px solid #d4c6e9;border-radius:12px;padding:12px;background:white;opacity:"+(unlocked?"1":".55");
   const title=document.createElement("strong");title.textContent=b.icon+" "+b.name+(unlocked?" ⭐":" 🔒");
   const desc=document.createElement("p");desc.textContent=b.description;el.append(title,desc);root.append(el);
  }
