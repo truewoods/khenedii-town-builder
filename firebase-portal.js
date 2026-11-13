@@ -65,14 +65,27 @@ async function parentLoad(){
   if(r.exists()){$("parentFeedback").value=r.data().feedback||"";$("approvedWeeks").value=(r.data().approvedWeeks||[]).join(", ")}
  }catch(e){$("parentSummary").textContent="Unable to load: "+e.message}
 }
+async function loadTeacherFeedback(){
+ if(role!=="student")return;
+ $("feedbackMessage").textContent="Checking for feedback…";
+ try{
+  const review=await getDoc(doc(db,"parentReviews",STUDENT));
+  const data=review.exists()?review.data():{};
+  $("teacherFeedbackText").textContent=data.feedback?.trim()||"No feedback yet. Keep working on your town!";
+  const weeks=Array.isArray(data.approvedWeeks)?data.approvedWeeks:[];
+  $("teacherApprovedWeeks").textContent=weeks.length?"Approved weeks: "+weeks.join(", "):"No approved weeks recorded yet.";
+  $("feedbackMessage").textContent="Feedback is up to date.";
+ }catch(e){$("feedbackMessage").textContent="Could not load feedback. Please try again."}
+}
+$("feedbackRefresh").onclick=loadTeacherFeedback;
 $("parentRefresh").onclick=parentLoad;
 onAuthStateChanged(auth,async user=>{
  $("loginError").textContent="";
- ready=false;role=null;show("authGate",!user);show("accountBar",!!user);show("parentPanel",false);show("studentCloud",false);
+ ready=false;role=null;show("authGate",!user);show("accountBar",!!user);show("parentPanel",false);show("studentCloud",false);show("teacherFeedback",false);
  if(!user)return;
  if(user.uid===PARENT){role="parent";$("accountName").textContent="Parent";show("parentPanel",true);await parentLoad();return}
  if(user.uid!==STUDENT){$("accountName").textContent="Unauthorized account";say("This account is not assigned to this project.");await signOut(auth);return}
- role="student";$("accountName").textContent="Student";show("studentCloud",true);
+ role="student";$("accountName").textContent="Student";show("studentCloud",true);show("teacherFeedback",true);
  try{
   const snap=await getDoc(doc(db,"studentProgress",STUDENT));
   if(snap.exists()&&snap.data().town){
@@ -99,6 +112,6 @@ onAuthStateChanged(auth,async user=>{
    }
   }else{say("No cloud save yet. Your next change will create one.")}
   ready=true;
-  try{const review=await getDoc(doc(db,"parentReviews",STUDENT));if(review.exists()){const feedback=review.data().feedback||"";if(feedback)say("Parent feedback: "+feedback.slice(0,500)+" — Your town is ready.");}}catch{}
+  await loadTeacherFeedback();
  }catch(e){say("Cloud unavailable; local progress still works. "+e.message);ready=true}
 });
