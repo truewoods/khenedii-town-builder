@@ -130,7 +130,7 @@ $("exportSchoolPdf").onclick=async()=>{
   const [progress,reviewSnap]=await Promise.all([getDoc(doc(db,"studentProgress",STUDENT)),getDoc(doc(db,"parentReviews",STUDENT))]);
   if(!progress.exists()||!progress.data().town)throw Error("No saved student work found.");
   const town=progress.data().town,reviews=reviewSnap.exists()?reviewSnap.data():{};
-  if(!window.jspdf?.jsPDF){
+  {
     const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
     const done=Object.entries(town.statuses||{}).filter(([k,v])=>v==="done").map(([k])=>Number(k)+1).sort((a,b)=>a-b);
     let html='<h1>Khenedii - Grade 12 Progress Report</h1><p>Generated: '+esc(new Date().toLocaleString())+'</p><p>School year: 2026-2027</p><p>Completed missions: '+done.length+' of 36</p><p>Completed weeks: '+esc(done.join(", ")||"None")+'</p><h2>Parent / Teacher Summary</h2><p>'+esc(reviews.feedback||"No overall feedback recorded.")+'</p>';
@@ -150,46 +150,7 @@ $("exportSchoolPdf").onclick=async()=>{
     status.textContent="Opening printable report…";
     return;
   }
-  const pdf=new window.jspdf.jsPDF({unit:"pt",format:"letter"});
-  const W=612,H=792,M=48,usable=W-2*M;let y=M,page=1;
-  function newPage(){pdf.addPage();page++;y=M}
-  function line(text,size=10,space=6,bold=false){
-    pdf.setFont("helvetica",bold?"bold":"normal");pdf.setFontSize(size);
-    const safe=String(text??"").replace(/[^\x20-\x7e\n]/g," ");
-    for(const row of pdf.splitTextToSize(safe,usable)){
-      if(y+size*1.35>H-50)newPage();
-      pdf.text(row,M,y);y+=size*1.35;
-    }
-    y+=space;
-  }
-  function heading(t){if(y>H-105)newPage();line(t,13,8,true)}
-  line("KHENEDII - GRADE 12 PROGRESS REPORT",17,10,true);
-  line("Generated: "+new Date().toLocaleString(),10,4);
-  line("Student: Khenedii | School year: 2026-2027",10,10);
-  line("Town project: "+(town.name||"Untitled"),11,8);
-  const completed=Object.entries(town.statuses||{}).filter(([k,v])=>v==="done").map(([k])=>Number(k)+1).sort((a,b)=>a-b);
-  line("Completed missions: "+completed.length+" of 36",11,4,true);
-  line("Completed weeks: "+(completed.join(", ")||"None recorded"),10,12);
-  heading("Parent / Teacher Summary");
-  line(reviews.feedback||"No overall feedback recorded.",10,10);
-  const allWeeks=new Set([...Object.keys(town.notebook||{}),...Object.keys(reviews.assignmentReviews||{}),...completed.map(n=>String(n-1))]);
-  for(const wk of [...allWeeks].sort((a,b)=>Number(a)-Number(b))){
-    const number=Number(wk)+1,entries=Array.isArray(town.notebook?.[wk])?town.notebook[wk]:[];
-    const review=reviews.assignmentReviews?.[wk]||{};
-    heading("Week "+number+" - "+(town.statuses?.[wk]||"not marked complete"));
-    line("Parent review: "+(review.status||"Not reviewed")+(review.bonusCredits?" | Bonus credits: "+review.bonusCredits:""),10,4,true);
-    if(review.feedback)line("Review notes: "+review.feedback,10,7);
-    if(!entries.length)line("No notebook entries recorded for this week.",9,5);
-    for(const entry of entries){
-      line((entry.kind||"Assignment")+" | "+(entry.savedAt||"Date not recorded"),10,4,true);
-      line(entry.text||"(Empty entry)",10,9);
-    }
-  }
-  if(!allWeeks.size)line("No submitted assignments recorded.",10,6);
-  const total=pdf.getNumberOfPages();
-  for(let p=1;p<=total;p++){pdf.setPage(p);pdf.setFontSize(9);pdf.setTextColor(90);pdf.text("Khenedii | Grade 12 Progress Report",M,H-28);pdf.text("Page "+p+" of "+total,W-M,H-28,{align:"right"});pdf.setTextColor(0)}
-  pdf.save("Khenedii_Grade12_Progress_"+new Date().toISOString().slice(0,10)+".pdf");
-  status.textContent="PDF generated. Check your Downloads folder.";
+
  }catch(e){status.textContent="Could not generate PDF: "+e.message}
 };
 async function parentLoad(){
