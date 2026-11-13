@@ -36,6 +36,7 @@ $("reviewSave").onclick=async()=>{
  if(role!=="parent")return;
  $("reviewStatus").textContent="Saving feedback…";
  try{
+  await rewardBaseline();
   await setDoc(doc(db,"parentReviews",STUDENT),{
    feedback:$("parentFeedback").value.slice(0,12000),
    approvedWeeks:$("approvedWeeks").value.split(",").map(s=>Number(s.trim())).filter(n=>Number.isInteger(n)&&n>=1&&n<=36),
