@@ -78,13 +78,25 @@ onAuthStateChanged(auth,async user=>{
   if(snap.exists()&&snap.data().town){
    const cloud=snap.data().town;
    const local=localStorage.getItem(localKey);
-   const useCloud=confirm("Cloud progress found. Press OK to load the saved cloud town. Press Cancel to keep this browser's town (you can export it before making changes).");
+   const cloudRaw=JSON.stringify(cloud);
+   // Keep the local copy as a recovery point before any cloud restore.
+   const isBlank=(raw)=>{try{const x=JSON.parse(raw);return x&&(!x.notebook||Object.values(x.notebook).every(a=>!a?.length))&&(!x.statuses||!Object.values(x.statuses).some(v=>v==="done"))&&(!x.tiles||x.tiles.every(v=>!v))}catch{return true}};
+   const conflict=local&&local!==cloudRaw&&!isBlank(local);
+   let useCloud=true;
+   if(conflict){
+     // Ask only for a genuine difference, not on every routine login.
+     useCloud=confirm("This browser has town work that differs from the cloud save. OK: use the cloud version. Cancel: keep this browser's version. Export a backup before replacing either copy.");
+   }
    if(useCloud){
-    localStorage.setItem(localKey,JSON.stringify(cloud));
-    lastUploaded=JSON.stringify(cloud);
+    if(conflict)try{localStorage.setItem("khenedii-town-pre-cloud-backup",local)}catch{}
+    localStorage.setItem(localKey,cloudRaw);
+    lastUploaded=cloudRaw;
     window.dispatchEvent(new CustomEvent("town-cloud-load",{detail:cloud}));
     say("✓ Cloud progress loaded");
-   }else{lastUploaded=local||"";say("Using local town. Cloud not overwritten. Save new work to sync.")}
+   }else{
+    lastUploaded=cloudRaw;
+    say("Local work kept. Export a backup before saving new work to the cloud.");
+   }
   }else{say("No cloud save yet. Your next change will create one.")}
   ready=true;
   try{const review=await getDoc(doc(db,"parentReviews",STUDENT));if(review.exists()){const feedback=review.data().feedback||"";if(feedback)say("Parent feedback: "+feedback.slice(0,500)+" — Your town is ready.");}}catch{}
