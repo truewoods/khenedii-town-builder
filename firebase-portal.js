@@ -127,10 +127,29 @@ $("exportSchoolPdf").onclick=async()=>{
  if(role!=="parent")return;
  const status=$("pdfExportStatus");status.textContent="Preparing school progress report…";
  try{
-  if(!window.jspdf?.jsPDF)throw Error("PDF library has not loaded. Refresh and try again.");
   const [progress,reviewSnap]=await Promise.all([getDoc(doc(db,"studentProgress",STUDENT)),getDoc(doc(db,"parentReviews",STUDENT))]);
   if(!progress.exists()||!progress.data().town)throw Error("No saved student work found.");
   const town=progress.data().town,reviews=reviewSnap.exists()?reviewSnap.data():{};
+  if(!window.jspdf?.jsPDF){
+    const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    const done=Object.entries(town.statuses||{}).filter(([k,v])=>v==="done").map(([k])=>Number(k)+1).sort((a,b)=>a-b);
+    let html='<h1>Khenedii - Grade 12 Progress Report</h1><p>Generated: '+esc(new Date().toLocaleString())+'</p><p>School year: 2026-2027</p><p>Completed missions: '+done.length+' of 36</p><p>Completed weeks: '+esc(done.join(", ")||"None")+'</p><h2>Parent / Teacher Summary</h2><p>'+esc(reviews.feedback||"No overall feedback recorded.")+'</p>';
+    const weeks=new Set([...Object.keys(town.notebook||{}),...Object.keys(reviews.assignmentReviews||{}),...done.map(n=>String(n-1))]);
+    for(const wk of [...weeks].sort((a,b)=>Number(a)-Number(b))){
+      const review=reviews.assignmentReviews?.[wk]||{};
+      html+='<section><h2>Week '+esc(Number(wk)+1)+'</h2><p>Status: '+esc(town.statuses?.[wk]||"not marked complete")+' | Parent review: '+esc(review.status||"Not reviewed")+'</p>';
+      if(review.feedback)html+='<p>Review notes: '+esc(review.feedback)+'</p>';
+      const entries=Array.isArray(town.notebook?.[wk])?town.notebook[wk]:[];
+      for(const entry of entries)html+='<article><h3>'+esc(entry.kind||"Assignment")+' - '+esc(entry.savedAt||"Date not recorded")+'</h3><p>'+esc(entry.text||"").replace(/\\n/g,"<br>")+'</p></article>';
+      html+='</section>';
+    }
+    let frame=document.getElementById("schoolPdfPrintFrame");
+    if(!frame){frame=document.createElement("iframe");frame.id="schoolPdfPrintFrame";frame.style.cssText="position:fixed;left:-10000px;top:0;width:800px;height:1000px;border:0";document.body.append(frame)}
+    frame.onload=()=>{status.textContent="Print window opened. Select 'Save as PDF' as the destination.";frame.contentWindow.focus();frame.contentWindow.print()};
+    frame.srcdoc='<!doctype html><html><head><title>Khenedii Grade 12 Progress</title><style>body{font:12pt Arial,sans-serif;color:#111;padding:24px}h1{font-size:20pt}h2{font-size:15pt;border-bottom:1px solid #bbb;padding-bottom:5px}section{break-inside:avoid-page;margin:20px 0}article{white-space:normal;margin:12px 0}p{line-height:1.5}@page{size:letter;margin:.7in}</style></head><body>'+html+'</body></html>';
+    status.textContent="Opening printable report…";
+    return;
+  }
   const pdf=new window.jspdf.jsPDF({unit:"pt",format:"letter"});
   const W=612,H=792,M=48,usable=W-2*M;let y=M,page=1;
   function newPage(){pdf.addPage();page++;y=M}
