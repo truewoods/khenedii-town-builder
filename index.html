@@ -78,4 +78,4 @@ $('notify').onclick=async()=>{if(!('Notification'in window)){$('coachMsg').textC
 window.addEventListener('town-parent-rewards',e=>{parentRewards=e.detail||null;render()});window.addEventListener('town-cloud-load',e=>{const obj=e.detail;if(!obj||!Array.isArray(obj.tiles)||obj.tiles.length!==81)return;state=obj;week=0;day=0;undoStack.length=0;redoStack.length=0;render()});
 clock();
 render()})();
-</script><script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script><script type="module" src="./firebase-portal.js"></script></body></html>
+</script><script type="module" src="./firebase-portal.js?v=20261113-printfix"></script></body></html>
