@@ -40,7 +40,7 @@ $("reviewSave").onclick=async()=>{
    feedback:$("parentFeedback").value.slice(0,12000),
    approvedWeeks:$("approvedWeeks").value.split(",").map(s=>Number(s.trim())).filter(n=>Number.isInteger(n)&&n>=1&&n<=36),
    updatedAt:serverTimestamp()
-  });
+  },{merge:true});
   $("reviewStatus").textContent="✓ Feedback saved";
  }catch(e){$("reviewStatus").textContent="Could not save: "+e.message}
 };
@@ -52,6 +52,7 @@ async function parentLoad(){
   const complete=Object.entries(statuses).filter(([k,v])=>v==="done").map(([k])=>Number(k)+1);
   $("parentSummary").textContent=data?"Town: "+(data.name||"Untitled")+" • Completed weeks: "+(complete.join(", ")||"none"):"No cloud progress uploaded yet.";
   $("parentNotebook").replaceChildren();
+  const reviews=r.exists()?(r.data().assignmentReviews||{}):{};
   if(data){
    for(const [week,entries] of Object.entries(data.notebook||{})){
     const section=document.createElement("details"),heading=document.createElement("summary");
@@ -59,6 +60,27 @@ async function parentLoad(){
     for(const entry of (Array.isArray(entries)?entries:[])){
      const p=document.createElement("p");p.style.whiteSpace="pre-wrap";p.textContent=(entry.kind||"Work")+" • "+(entry.savedAt||"")+"\n"+(entry.text||"");section.append(p);
     }
+    const review=reviews[week]||{};
+    const label=document.createElement("label");label.textContent="Review status — Week "+(Number(week)+1);
+    const status=document.createElement("select");
+    for(const [value,title] of [["pending","Not reviewed"],["approved","Approved"],["revision","Needs revision"]]){const option=document.createElement("option");option.value=value;option.textContent=title;status.append(option)}
+    status.value=review.status||"pending";
+    const notes=document.createElement("textarea");notes.rows=3;notes.placeholder="Feedback for Week "+(Number(week)+1);notes.value=review.feedback||"";
+    const saveReview=document.createElement("button");saveReview.type="button";saveReview.textContent="Save Week "+(Number(week)+1)+" review";
+    const message=document.createElement("span");message.setAttribute("role","status");
+    saveReview.onclick=async()=>{
+      if(role!=="parent")return;
+      saveReview.disabled=true;message.textContent=" Saving review…";
+      try{
+        const current=await getDoc(doc(db,"parentReviews",STUDENT));
+        const all={...(current.exists()?current.data().assignmentReviews||{}:{})};
+        all[week]={status:status.value,feedback:notes.value.slice(0,6000),reviewedAt:new Date().toISOString()};
+        await setDoc(doc(db,"parentReviews",STUDENT),{assignmentReviews:all,updatedAt:serverTimestamp()},{merge:true});
+        message.textContent=" ✓ Review saved";
+      }catch(e){message.textContent=" Could not save review: "+e.message}
+      finally{saveReview.disabled=false}
+    };
+    section.append(label,status,notes,saveReview,message);
     $("parentNotebook").append(section);
    }
   }
@@ -74,6 +96,15 @@ async function loadTeacherFeedback(){
   $("teacherFeedbackText").textContent=data.feedback?.trim()||"No feedback yet. Keep working on your town!";
   const weeks=Array.isArray(data.approvedWeeks)?data.approvedWeeks:[];
   $("teacherApprovedWeeks").textContent=weeks.length?"Approved weeks: "+weeks.join(", "):"No approved weeks recorded yet.";
+  $("studentReviews").replaceChildren();
+  const reviews=data.assignmentReviews||{};
+  for(const [week,review] of Object.entries(reviews).sort((a,b)=>Number(a[0])-Number(b[0]))){
+    const panel=document.createElement("div");panel.style.cssText="border-top:1px solid #ddd;padding:10px 0";
+    const heading=document.createElement("strong");heading.textContent="Week "+(Number(week)+1)+" — "+({approved:"✓ Approved",revision:"↩ Needs revision",pending:"Awaiting review"}[review.status]||"Awaiting review");
+    const note=document.createElement("p");note.style.whiteSpace="pre-wrap";note.textContent=review.feedback||"No written notes.";
+    panel.append(heading,note);$("studentReviews").append(panel);
+  }
+  if(!Object.keys(reviews).length)$("studentReviews").textContent="No individual assignment reviews yet.";
   $("feedbackMessage").textContent="Feedback is up to date.";
  }catch(e){$("feedbackMessage").textContent="Could not load feedback. Please try again."}
 }
