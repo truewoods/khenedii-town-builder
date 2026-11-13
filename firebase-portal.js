@@ -67,6 +67,7 @@ async function parentLoad(){
 }
 $("parentRefresh").onclick=parentLoad;
 onAuthStateChanged(auth,async user=>{
+ $("loginError").textContent="";
  ready=false;role=null;show("authGate",!user);show("accountBar",!!user);show("parentPanel",false);show("studentCloud",false);
  if(!user)return;
  if(user.uid===PARENT){role="parent";$("accountName").textContent="Parent";show("parentPanel",true);await parentLoad();return}
