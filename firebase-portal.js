@@ -11,7 +11,8 @@ const say=(s)=>{$("cloudStatus").textContent=s};
 const show=(id,yes)=>{$(id).hidden=!yes};
 function sanitize(s){return String(s||"").slice(0,20000)}
 async function upload(){
- if(role!=="student"||!ready||busy)return;
+ if(role!=="student"||!ready)return;
+ if(busy){pending=true;return}
  const raw=localStorage.getItem(localKey);if(!raw||raw===lastUploaded)return;
  let town;try{town=JSON.parse(raw)}catch{return}
  busy=true;say("Saving to cloud…");
@@ -85,5 +86,6 @@ onAuthStateChanged(auth,async user=>{
    }else{lastUploaded=local||"";say("Using local town. Cloud not overwritten. Save new work to sync.")}
   }else{say("No cloud save yet. Your next change will create one.")}
   ready=true;
+  try{const review=await getDoc(doc(db,"parentReviews",STUDENT));if(review.exists()){const feedback=review.data().feedback||"";if(feedback)say("Parent feedback: "+feedback.slice(0,500)+" — Your town is ready.");}}catch{}
  }catch(e){say("Cloud unavailable; local progress still works. "+e.message);ready=true}
 });
