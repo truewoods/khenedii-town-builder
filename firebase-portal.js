@@ -63,6 +63,56 @@ function rewardPayload(data){
  const bonusTotal=Object.values(reviews).reduce((n,v)=>n+(Number.isInteger(v.bonusCredits)?Math.max(0,Math.min(10,v.bonusCredits)):0),0);
  return {legacyWeeks:legacy,approvedWeeks:[...approved],bonusTotal};
 }
+const milestoneBadges=[
+ {id:"first",icon:"🌱",name:"First Steps",description:"Complete your first weekly mission.",check:t=>Object.values(t.statuses||{}).some(v=>v==="done")},
+ {id:"research",icon:"🔎",name:"Research Explorer",description:"Save at least five research notes.",check:t=>Object.values(t.notebook||{}).flat().filter(e=>e.kind==="research").length>=5||Object.values(t.research||{}).filter(v=>String(v||"").trim()).length>=5},
+ {id:"architect",icon:"🏗️",name:"Creative Architect",description:"Place at least five buildings or roads.",check:t=>(t.tiles||[]).filter(Boolean).length>=5},
+ {id:"planner",icon:"🏙️",name:"Town Planner",description:"Complete four weekly missions.",check:t=>Object.values(t.statuses||{}).filter(v=>v==="done").length>=4},
+ {id:"master",icon:"👑",name:"Master Town Planner",description:"Complete all 36 weekly missions.",check:t=>Object.values(t.statuses||{}).filter(v=>v==="done").length>=36}
+];
+const specialBadges=[
+ {id:"science",icon:"⚛️",name:"Science Superstar",description:"Exceptional scientific thinking."},
+ {id:"civic",icon:"🏛️",name:"Civic Leader",description:"Outstanding citizenship and government work."},
+ {id:"creative",icon:"🎨",name:"Creative Visionary",description:"Exceptional art, design, or originality."},
+ {id:"writer",icon:"✍️",name:"Storyteller",description:"Outstanding writing and communication."},
+ {id:"extra",icon:"🌟",name:"Above and Beyond",description:"An outstanding optional challenge."}
+];
+let achievementTown=null,specialAwards=[];
+function drawAchievements(){
+ const root=$("achievementList");root.replaceChildren();
+ let earned=0;
+ for(const b of milestoneBadges){
+  const unlocked=achievementTown?b.check(achievementTown):false;if(unlocked)earned++;
+  const el=document.createElement("div");el.style.cssText="flex:1 1 165px;max-width:250px;border:1px solid #d4c6e9;border-radius:12px;padding:12px;background:white;opacity:"+(unlocked?"1":".55");
+  const title=document.createElement("strong");title.textContent=b.icon+" "+b.name+(unlocked?" ✓":" 🔒");
+  const desc=document.createElement("p");desc.textContent=b.description;el.append(title,desc);root.append(el);
+ }
+ for(const b of specialBadges){
+  const unlocked=specialAwards.includes(b.id);if(unlocked)earned++;
+  const el=document.createElement("div");el.style.cssText="flex:1 1 165px;max-width:250px;border:1px solid #d4c6e9;border-radius:12px;padding:12px;background:white;opacity:"+(unlocked?"1":".55");
+  const title=document.createElement("strong");title.textContent=b.icon+" "+b.name+(unlocked?" ⭐":" 🔒");
+  const desc=document.createElement("p");desc.textContent=b.description;el.append(title,desc);root.append(el);
+ }
+ $("achievementSummary").textContent=earned+" of "+(milestoneBadges.length+specialBadges.length)+" achievements earned.";
+}
+window.addEventListener("town-achievements-update",e=>{achievementTown=e.detail?.town||null;drawAchievements()});
+function drawParentBadgeControls(awards){
+ const root=$("parentBadgeControls");root.replaceChildren();
+ for(const b of specialBadges){
+  const label=document.createElement("label");label.style.cssText="display:block;margin:8px 0";
+  const input=document.createElement("input");input.type="checkbox";input.value=b.id;input.checked=awards.includes(b.id);input.className="specialBadgeCheck";
+  label.append(input,document.createTextNode(" "+b.icon+" "+b.name+" — "+b.description));root.append(label);
+ }
+}
+$("saveBadges").onclick=async()=>{
+ if(role!=="parent")return;
+ $("badgeSaveStatus").textContent="Saving badges…";
+ try{
+  const selected=[...document.querySelectorAll(".specialBadgeCheck:checked")].map(e=>e.value);
+  await setDoc(doc(db,"parentReviews",STUDENT),{specialBadges:selected,updatedAt:serverTimestamp()},{merge:true});
+  $("badgeSaveStatus").textContent="✓ Special badges saved.";
+ }catch(e){$("badgeSaveStatus").textContent="Could not save badges: "+e.message}
+};
 async function parentLoad(){
  try{
   const [p,r]=await Promise.all([getDoc(doc(db,"studentProgress",STUDENT)),getDoc(doc(db,"parentReviews",STUDENT))]);
@@ -72,6 +122,7 @@ async function parentLoad(){
   $("parentSummary").textContent=data?"Town: "+(data.name||"Untitled")+" • Completed weeks: "+(complete.join(", ")||"none"):"No cloud progress uploaded yet.";
   $("parentNotebook").replaceChildren();
   const reviews=r.exists()?(r.data().assignmentReviews||{}):{};
+  drawParentBadgeControls(r.exists()&&Array.isArray(r.data().specialBadges)?r.data().specialBadges:[]);
   if(data){
    for(const [week,entries] of Object.entries(data.notebook||{})){
     const section=document.createElement("details"),heading=document.createElement("summary");
@@ -116,6 +167,8 @@ async function loadTeacherFeedback(){
  try{
   const review=await getDoc(doc(db,"parentReviews",STUDENT));
   const data=review.exists()?review.data():{};
+  specialAwards=Array.isArray(data.specialBadges)?data.specialBadges.filter(id=>specialBadges.some(b=>b.id===id)):[];
+  drawAchievements();
   $("teacherFeedbackText").textContent=data.feedback?.trim()||"No feedback yet. Keep working on your town!";
   const rewards=rewardPayload(data);
   const weeks=rewards.approvedWeeks;
